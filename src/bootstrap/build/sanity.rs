@@ -63,6 +63,12 @@ pub fn check(build: &mut Build) {
         need_cmd(build.cxx(host).as_ref());
     }
 
+    // Externally configured LLVM requires FileCheck to exist
+    let filecheck = build.llvm_filecheck(&build.config.build);
+    if !filecheck.starts_with(&build.out) && !filecheck.exists() {
+        panic!("filecheck executable {:?} does not exist", filecheck);
+    }
+
     for target in build.config.target.iter() {
         // Either can't build or don't want to run jemalloc on these targets
         if target.contains("rumprun") ||

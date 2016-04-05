@@ -51,6 +51,7 @@ macro_rules! targets {
             (tool_rustbook, ToolRustbook { stage: u32 }),
             (tool_error_index, ToolErrorIndex { stage: u32 }),
             (tool_cargotest, ToolCargoTest { stage: u32 }),
+            (tool_compiletest, ToolCompiletest { stage: u32 }),
 
             // Steps for long-running native builds. Ideally these wouldn't
             // actually exist and would be part of build scripts, but for now
@@ -60,6 +61,7 @@ macro_rules! targets {
             // with braces are unstable so we just pick something that works.
             (llvm, Llvm { _dummy: () }),
             (compiler_rt, CompilerRt { _dummy: () }),
+            (test_helpers, TestHelpers { _dummy: () }),
 
             // Steps for various pieces of documentation that we can generate,
             // the 'doc' step is just a pseudo target to depend on a bunch of
@@ -79,6 +81,18 @@ macro_rules! targets {
             (check, Check { stage: u32, compiler: Compiler<'a> }),
             (check_linkcheck, CheckLinkcheck { stage: u32 }),
             (check_cargotest, CheckCargoTest { stage: u32 }),
+            (check_rpass, CheckRPass { compiler: Compiler<'a> }),
+            (check_rfail, CheckRFail { compiler: Compiler<'a> }),
+            (check_cfail, CheckCFail { compiler: Compiler<'a> }),
+            (check_pfail, CheckPFail { compiler: Compiler<'a> }),
+            (check_codegen, CheckCodegen { compiler: Compiler<'a> }),
+            (check_codegen_units, CheckCodegenUnits { compiler: Compiler<'a> }),
+            (check_debuginfo, CheckDebuginfo { compiler: Compiler<'a> }),
+            (check_rustdoc, CheckRustdoc { compiler: Compiler<'a> }),
+            (check_pretty, CheckPretty { compiler: Compiler<'a> }),
+            (check_rpass_valgrind, CheckRPassValgrind { compiler: Compiler<'a> }),
+            (check_rpass_full, CheckRPassFull { compiler: Compiler<'a> }),
+            (check_cfail_full, CheckCFailFull { compiler: Compiler<'a> }),
 
             // Distribution targets, creating tarballs
             (dist, Dist { stage: u32 }),
@@ -274,6 +288,7 @@ impl<'a> Step<'a> {
                 vec![self.llvm(()).target(&build.config.build)]
             }
             Source::Llvm { _dummy } => Vec::new(),
+            Source::TestHelpers { _dummy } => Vec::new(),
 
             // Note that all doc targets depend on artifacts from the build
             // architecture, not the target (which is where we're generating
@@ -306,15 +321,48 @@ impl<'a> Step<'a> {
                      self.doc_std(stage),
                      self.doc_error_index(stage)]
             }
-            Source::Check { stage, compiler: _ } => {
-                vec![self.check_linkcheck(stage),
-                     self.dist(stage)]
+            Source::Check { stage, compiler } => {
+                vec![
+                    self.check_rpass(compiler),
+                    self.check_cfail(compiler),
+                    self.check_rfail(compiler),
+                    self.check_pfail(compiler),
+                    self.check_codegen(compiler),
+                    self.check_codegen_units(compiler),
+                    self.check_debuginfo(compiler),
+                    self.check_rustdoc(compiler),
+                    self.check_pretty(compiler),
+                    self.check_rpass_valgrind(compiler),
+                    self.check_rpass_full(compiler),
+                    self.check_cfail_full(compiler),
+                    self.check_linkcheck(stage),
+                    self.dist(stage),
+                ]
             }
             Source::CheckLinkcheck { stage } => {
                 vec![self.tool_linkchecker(stage), self.doc(stage)]
             }
             Source::CheckCargoTest { stage } => {
                 vec![self.tool_cargotest(stage)]
+            }
+            Source::CheckRFail { compiler } |
+            Source::CheckPFail { compiler } |
+            Source::CheckCodegen { compiler } |
+            Source::CheckCodegenUnits { compiler } |
+            Source::CheckDebuginfo { compiler } |
+            Source::CheckRustdoc { compiler } |
+            Source::CheckPretty { compiler } |
+            Source::CheckCFail { compiler } |
+            Source::CheckRPassValgrind { compiler } |
+            Source::CheckRPass { compiler } => {
+                vec![self.libtest(compiler),
+                     self.tool_compiletest(compiler.stage),
+                     self.test_helpers(())]
+            }
+            Source::CheckRPassFull { compiler } |
+            Source::CheckCFailFull { compiler } => {
+                vec![self.librustc(compiler),
+                     self.tool_compiletest(compiler.stage)]
             }
 
             Source::ToolLinkchecker { stage } => {
@@ -326,6 +374,9 @@ impl<'a> Step<'a> {
             }
             Source::ToolCargoTest { stage } => {
                 vec![self.librustc(self.compiler(stage))]
+            }
+            Source::ToolCompiletest { stage } => {
+                vec![self.libtest(self.compiler(stage))]
             }
 
             Source::DistDocs { stage } => vec![self.doc(stage)],
