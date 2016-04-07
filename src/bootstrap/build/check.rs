@@ -73,6 +73,13 @@ pub fn compiletest(build: &Build,
     // FIXME: CFG_PYTHON should probably be detected more robustly elsewhere
     cmd.arg("--python").arg("python");
 
+    if let Some(ref vers) = build.gdb_version {
+        cmd.arg("--gdb-version").arg(vers);
+    }
+    if let Some(ref vers) = build.lldb_version {
+        cmd.arg("--lldb-version").arg(vers);
+    }
+
     cmd.args(&build.flags.args);
 
     if build.config.verbose || build.flags.verbose {

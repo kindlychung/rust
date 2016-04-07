@@ -137,4 +137,14 @@ $ pacman -R cmake && pacman -S mingw-w64-x86_64-cmake
                    target);
         }
     }
+
+    let version = |cmd: &str| {
+        Command::new(cmd).arg("--version").output().map(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                   .lines().next().unwrap()
+                   .to_string()
+        })
+    };
+    build.gdb_version = version("gdb").ok();
+    build.lldb_version = version("lldb").ok();
 }

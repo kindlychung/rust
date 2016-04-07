@@ -62,6 +62,7 @@ macro_rules! targets {
             (llvm, Llvm { _dummy: () }),
             (compiler_rt, CompilerRt { _dummy: () }),
             (test_helpers, TestHelpers { _dummy: () }),
+            (debugger_scripts, DebuggerScripts { stage: u32 }),
 
             // Steps for various pieces of documentation that we can generate,
             // the 'doc' step is just a pseudo target to depend on a bunch of
@@ -289,6 +290,7 @@ impl<'a> Step<'a> {
             }
             Source::Llvm { _dummy } => Vec::new(),
             Source::TestHelpers { _dummy } => Vec::new(),
+            Source::DebuggerScripts { stage: _ } => Vec::new(),
 
             // Note that all doc targets depend on artifacts from the build
             // architecture, not the target (which is where we're generating
@@ -355,9 +357,12 @@ impl<'a> Step<'a> {
             Source::CheckCFail { compiler } |
             Source::CheckRPassValgrind { compiler } |
             Source::CheckRPass { compiler } => {
-                vec![self.libtest(compiler),
-                     self.tool_compiletest(compiler.stage),
-                     self.test_helpers(())]
+                vec![
+                    self.libtest(compiler),
+                    self.tool_compiletest(compiler.stage),
+                    self.test_helpers(()),
+                    self.debugger_scripts(compiler.stage),
+                ]
             }
             Source::CheckRPassFull { compiler } |
             Source::CheckCFailFull { compiler } => {

@@ -80,6 +80,10 @@ pub struct Build {
     package_vers: String,
     bootstrap_key: String,
 
+    // Probed tools at runtime
+    gdb_version: Option<String>,
+    lldb_version: Option<String>,
+
     // Runtime state filled in later on
     cc: HashMap<String, (gcc::Tool, PathBuf)>,
     cxx: HashMap<String, gcc::Tool>,
@@ -128,6 +132,8 @@ impl Build {
             cc: HashMap::new(),
             cxx: HashMap::new(),
             compiler_rt_built: RefCell::new(HashMap::new()),
+            gdb_version: None,
+            lldb_version: None,
         }
     }
 
@@ -290,6 +296,13 @@ impl Build {
                 DistMingw { _dummy } => dist::mingw(self, target.target),
                 DistRustc { stage } => dist::rustc(self, stage, target.target),
                 DistStd { compiler } => dist::std(self, &compiler, target.target),
+
+                DebuggerScripts { stage } => {
+                    let compiler = Compiler::new(stage, target.target);
+                    dist::debugger_scripts(self,
+                                           &self.sysroot(&compiler),
+                                           target.target);
+                }
 
                 Dist { .. } |
                 Doc { .. } | // pseudo-steps
@@ -588,8 +601,11 @@ impl Build {
     }
 
     fn cflags(&self, target: &str) -> Vec<String> {
+        // Filter out -O and /O (the optimization flags) that we picked up from
+        // gcc-rs because the build scripts will determine that for themselves.
         let mut base = self.cc[target].0.args().iter()
                            .map(|s| s.to_string_lossy().into_owned())
+                           .filter(|s| !s.starts_with("-O") && !s.starts_with("/O"))
                            .collect::<Vec<_>>();
 
         // If we're compiling on OSX then we add a few unconditional flags
