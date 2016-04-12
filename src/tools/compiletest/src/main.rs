@@ -8,13 +8,13 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-#![crate_type = "bin"]
+#![crate_name = "compiletest"]
 
 #![feature(box_syntax)]
-#![feature(libc)]
 #![feature(rustc_private)]
 #![feature(test)]
 #![feature(question_mark)]
+#![feature(libc)]
 
 #![deny(warnings)]
 
@@ -24,6 +24,9 @@ extern crate getopts;
 
 #[macro_use]
 extern crate log;
+
+#[cfg(cargobuild)]
+extern crate env_logger;
 
 use std::env;
 use std::fs;
@@ -43,7 +46,13 @@ pub mod common;
 pub mod errors;
 mod raise_fd_limit;
 
-pub fn main() {
+fn main() {
+    #[cfg(cargobuild)]
+    fn log_init() { env_logger::init().unwrap(); }
+    #[cfg(not(cargobuild))]
+    fn log_init() {}
+    log_init();
+
     let config = parse_config(env::args().collect());
 
     if config.valgrind_path.is_none() && config.force_valgrind {
